@@ -55,6 +55,11 @@ make
 
 sed -i '5i\    user: "1000:50"' docker-compose.yml
 
+
+sudo docker-compose up -d
+
+./build/fleet prepare db
+
 sudo mkdir -p /etc/pki
 sudo mkdir -p /etc/pki/tls
 sudo mkdir -p /etc/pki/tls/certs
@@ -64,15 +69,9 @@ sudo openssl genrsa -out /etc/pki/tls/private/server.key 4096
 sudo openssl req -new -key /etc/pki/tls/private/server.key -out /etc/pki/tls/certs/server.csr
 sudo openssl x509 -req -days 366 -in /etc/pki/tls/certs/server.csr -signkey /etc/pki/tls/private/server.key -out /etc/pki/tls/certs/server.cert
 
-sudo docker-compose up -d
+sudo touch /etc/systemd/system/fleet.service
 
-
-
-./build/fleet prepare db
-
-
-cat > /etc/systemd/system/fleet.service << EOF
-[Unit]
+echo '[Unit]
 Description=Kolide Fleet Application Server
 [Service]
 User=fleet
@@ -80,22 +79,28 @@ WorkingDirectory=/home/fleet/go/src/github.com/kolide/fleet
 Environment="PATH=/home/fleet/go/src/github.com/kolide/fleet/build/"
 ExecStart=/home/fleet/go/src/github.com/kolide/fleet/build/fleet serve --config /home/fleet/go/src/github.com/kolide/fleet/kolide.yml
 [Install]
-WantedBy=multi-user.target
-EOF
+WantedBy=multi-user.target' >> /etc/systemd/system/fleet.service
 
 key=$(openssl rand -base64 32)
-key=${key::-1}
+key=${key%?}
 
-cat > $GOPATH/src/github.com/kolide/fleet/kolide.yml << EOF
-server:
+
+sudo touch /home/fleet/go/src/github.com/kolide/fleet/kolide.yml
+echo "server:
 cert: /etc/pki/tls/certs/server.cert
 key: /etc/pki/tls/private/server.key
 address: 0.0.0.0:8080
 logging:
   json: true
 auth:
-  jwt_key: $key
-EOF
+  jwt_key: $key" >> /home/fleet/go/src/github.com/kolide/fleet/kolide.yml
+
+
+sudo systemctl enable fleet
+sudo systemctl start fleet
+
+
+
 
 
 
